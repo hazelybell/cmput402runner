@@ -4,28 +4,36 @@
   tasks:
   - name: Create apt keyrings dir
     ansible.builtin.file:
+      state: directory
       path: /etc/apt/keyrings
       owner: root
       group: root
       mode: 0755
   - name: Copy Temurin/Adoptium repo key
-    copy:
+    ansible.builtin.copy:
       src: temurin_adoptium.asc
       dest: /etc/apt/trusted.gpg.d/
       owner: root
       group: root
       mode: 0644
   - name: Copy Temurin/Adoptium repo sources.list
-    copy:
+    ansible.builtin.copy:
       src: temurin_adoptium.list
       dest: /etc/apt/sources.list.d/
       owner: root
       group: root
       mode: 0644
   - name: Copy docker repo key
-    copy:
-      src: docker.asc
-      dest: /etc/apt/trusted.gpg.d/
+    ansible.builtin.copy:
+      src: docker.gpg
+      dest: /etc/apt/keyrings/
+      owner: root
+      group: root
+      mode: 0644
+  - name: Copy docker repo sources.list
+    ansible.builtin.copy:
+      src: docker.list
+      dest: /etc/apt/sources.list.d/
       owner: root
       group: root
       mode: 0644
@@ -33,6 +41,14 @@
     ansible.builtin.apt:
       update_cache: yes
       upgrade: dist
+  - name: Mask docker system daemon
+    ansible.builtin.systemd:
+      name: docker.service
+      masked: true
+  - name: Mask docker system daemon
+    ansible.builtin.systemd:
+      name: docker.socket
+      masked: true
   - name: Install packages
     ansible.builtin.apt:
       state: present
@@ -45,5 +61,38 @@
         - ca-certificates
         - curl
         - lsb-release
-
+        - unattended-upgrades
+        - temurin-17-jdk
+        - docker-ce
+        - docker-ce-cli
+        - containerd.io
+        - docker-buildx-plugin
+        - docker-compose-plugin
+  - name: Enable unattended upgrades
+    ansible.builtin.copy:
+      src: 20auto-upgrades
+      dest: /etc/apt/apt.conf.d/
+      owner: root
+      group: root
+      mode: 0644
+  - name: Enable unattended upgrades 2
+    ansible.builtin.copy:
+      src: 50unattended-upgrades
+      dest: /etc/apt/apt.conf.d/
+      owner: root
+      group: root
+      mode: 0644
+  - name: Enable cgroups v2
+    ansible.builtin.lineinfile:
+      path: /etc/default/grub
+      regexp: 'unified_cgroup_hierarchy'
+      line: GRUB_CMDLINE_LINUX="${GRUB_CMDLINE_LINUX} systemd.unified_cgroup_hierarchy=1"
+    register: cgroupsv2
+  - name: Regenerate grub conf
+    ansible.builtin.shell: |
+      update-grub
+    when: cgroupsv2.changed
+  - name: Reboot
+    ansible.builtin.reboot:
+    when: cgroupsv2.changed
 ...

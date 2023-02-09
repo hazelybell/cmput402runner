@@ -1,0 +1,49 @@
+---
+- hosts: runners
+  remote_user: root
+  tasks:
+  - name: Create apt keyrings dir
+    ansible.builtin.file:
+      path: /etc/apt/keyrings
+      owner: root
+      group: root
+      mode: 0755
+  - name: Copy Temurin/Adoptium repo key
+    copy:
+      src: temurin_adoptium.asc
+      dest: /etc/apt/trusted.gpg.d/
+      owner: root
+      group: root
+      mode: 0644
+  - name: Copy Temurin/Adoptium repo sources.list
+    copy:
+      src: temurin_adoptium.list
+      dest: /etc/apt/sources.list.d/
+      owner: root
+      group: root
+      mode: 0644
+  - name: Copy docker repo key
+    copy:
+      src: docker.asc
+      dest: /etc/apt/trusted.gpg.d/
+      owner: root
+      group: root
+      mode: 0644
+  - name: Install latest updates
+    ansible.builtin.apt:
+      update_cache: yes
+      upgrade: dist
+  - name: Install packages
+    ansible.builtin.apt:
+      state: present
+      name:
+        - screen
+        - rsync
+        - aptitude
+        - apt-transport-https
+        - gnupg
+        - ca-certificates
+        - curl
+        - lsb-release
+
+...
